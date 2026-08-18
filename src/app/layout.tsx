@@ -35,6 +35,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://www.salemdistrictweightliftingassociation.in'),
   title: {
     default: "SDWA | Salem District Weightlifting Association",
     template: "%s | SDWA",
