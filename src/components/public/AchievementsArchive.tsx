@@ -18,23 +18,47 @@ export default function AchievementsArchive({
   categories,
   levels,
 }: AchievementsArchiveProps) {
+  const [achievements, setAchievements] = useState<Achievement[]>(initialAchievements);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedLevel, setSelectedLevel] = useState<string>('ALL');
   const [selectedSeason, setSelectedSeason] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  React.useEffect(() => {
+    setAchievements(initialAchievements);
+  }, [initialAchievements]);
+
+  React.useEffect(() => {
+    async function syncAchievements() {
+      try {
+        const latest = await import('@/lib/firebase/firestore').then((m) =>
+          m.getCollection<Achievement>('achievements', { orderBy: 'displayOrder' })
+        );
+        if (latest) setAchievements(latest);
+      } catch (e) {}
+    }
+    syncAchievements();
+    const handleSync = () => syncAchievements();
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('focus', handleSync);
+    return () => {
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('focus', handleSync);
+    };
+  }, []);
+
   // Extract unique seasons
   const seasons = useMemo(() => {
     const list = new Set<string>();
-    initialAchievements.forEach((a) => {
+    achievements.forEach((a) => {
       if (a.season) list.add(a.season);
     });
     return Array.from(list).sort().reverse();
-  }, [initialAchievements]);
+  }, [achievements]);
 
   // Dynamic filtered list
   const filtered = useMemo(() => {
-    return initialAchievements.filter((a) => {
+    return achievements.filter((a) => {
       if (selectedCategory !== 'ALL' && a.categoryId !== selectedCategory) {
         return false;
       }
@@ -53,7 +77,7 @@ export default function AchievementsArchive({
       }
       return true;
     });
-  }, [initialAchievements, selectedCategory, selectedLevel, selectedSeason, searchQuery]);
+  }, [achievements, selectedCategory, selectedLevel, selectedSeason, searchQuery]);
 
   const getCategoryName = (id: string) => categories.find((c) => c.id === id)?.name;
   const getLevelName = (id: string) => levels.find((l) => l.id === id)?.name;
@@ -136,7 +160,7 @@ export default function AchievementsArchive({
         <div className="flex items-center justify-between pt-1 border-t border-slate-100">
           <span className="text-xs text-slate-500 font-medium">
             Showing <span className="font-bold text-slate-700">{filtered.length}</span> of{' '}
-            <span className="font-bold text-slate-700">{initialAchievements.length}</span> records
+            <span className="font-bold text-slate-700">{achievements.length}</span> records
           </span>
           {(selectedCategory !== 'ALL' ||
             selectedLevel !== 'ALL' ||

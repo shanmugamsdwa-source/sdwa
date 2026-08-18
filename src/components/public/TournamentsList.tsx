@@ -12,13 +12,37 @@ interface TournamentsListProps {
 }
 
 export default function TournamentsList({ initialTournaments }: TournamentsListProps) {
+  const [tournaments, setTournaments] = useState<Tournament[]>(initialTournaments);
   const [activeTab, setActiveTab] = useState<'ALL' | 'OPEN' | 'UPCOMING' | 'CLOSED' | 'PAST'>('ALL');
+
+  React.useEffect(() => {
+    setTournaments(initialTournaments);
+  }, [initialTournaments]);
+
+  React.useEffect(() => {
+    async function syncTournaments() {
+      try {
+        const latest = await import('@/lib/firebase/firestore').then((m) =>
+          m.getCollection<Tournament>('tournaments', { orderBy: 'displayOrder' })
+        );
+        if (latest) setTournaments(latest);
+      } catch (e) {}
+    }
+    syncTournaments();
+    const handleSync = () => syncTournaments();
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('focus', handleSync);
+    return () => {
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('focus', handleSync);
+    };
+  }, []);
 
   const now = new Date();
 
   // Categorize tournaments
   const categorized = useMemo(() => {
-    return initialTournaments.map((t) => {
+    return tournaments.map((t) => {
       const endDate = toSafeDate(t.endDate);
       const startDate = toSafeDate(t.startDate);
       const deadlineDate = toSafeDate(t.registrationDeadline);

@@ -9,7 +9,7 @@ export const metadata = {
     'Official Salem District Weightlifting competition calendars, tournament entry forms, registration rules, weight divisions, and categories.',
 };
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function TournamentsPage() {
   let tournaments: Tournament[] = [];

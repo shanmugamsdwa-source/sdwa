@@ -9,7 +9,7 @@ export const metadata = {
     'Official records, medals, and championship achievements of Salem District Weightlifting Association athletes across District, State, National, and International meets.',
 };
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function AchievementsPage() {
   let achievements: Achievement[] = [];

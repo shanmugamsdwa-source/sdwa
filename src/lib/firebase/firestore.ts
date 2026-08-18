@@ -242,7 +242,13 @@ export async function getCollection<T>(
   if (options?.where) {
     for (const [field, op, value] of options.where) {
       results = results.filter((item: any) => {
-        if (op === '==') return item[field] === value;
+        if (op === '==') {
+          const val = item[field];
+          if (val === undefined && (field === 'isPublished' || field === 'isActive')) {
+            return value === true;
+          }
+          return val === value;
+        }
         if (op === '!=') return item[field] !== value;
         if (op === 'in' && Array.isArray(value)) return value.includes(item[field]);
         return true;

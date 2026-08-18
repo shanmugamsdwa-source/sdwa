@@ -10,14 +10,38 @@ interface CentresListProps {
 }
 
 export default function CentresList({ initialCentres }: CentresListProps) {
+  const [centres, setCentres] = useState<AffiliatedCentre[]>(initialCentres);
   const [selectedType, setSelectedType] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'order' | 'alphabetical'>('order');
 
+  React.useEffect(() => {
+    setCentres(initialCentres);
+  }, [initialCentres]);
+
+  React.useEffect(() => {
+    async function syncCentres() {
+      try {
+        const latest = await import('@/lib/firebase/firestore').then((m) =>
+          m.getCollection<AffiliatedCentre>('affiliatedCentres', { orderBy: 'displayOrder' })
+        );
+        if (latest) setCentres(latest);
+      } catch (e) {}
+    }
+    syncCentres();
+    const handleSync = () => syncCentres();
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('focus', handleSync);
+    return () => {
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('focus', handleSync);
+    };
+  }, []);
+
   // Dynamically extract unique centre types from published data with counts
   const dynamicTypes = useMemo(() => {
     const counts = new Map<string, number>();
-    initialCentres.forEach((c) => {
+    centres.forEach((c) => {
       const type = c.centreType || c.organizationType || 'Other';
       counts.set(type, (counts.get(type) || 0) + 1);
     });
@@ -29,11 +53,11 @@ export default function CentresList({ initialCentres }: CentresListProps) {
 
     // Sort by count descending or logical priority
     return typesList.sort((a, b) => b.count - a.count);
-  }, [initialCentres]);
+  }, [centres]);
 
   // Combined Search & Filter Logic
   const filteredAndSorted = useMemo(() => {
-    const result = initialCentres.filter((centre) => {
+    const result = centres.filter((centre) => {
       // Filter by type
       if (selectedType !== 'ALL') {
         const type = centre.centreType || centre.organizationType;

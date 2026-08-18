@@ -32,7 +32,7 @@ import {
   Flame,
 } from 'lucide-react';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   let tournaments: Tournament[] = [];

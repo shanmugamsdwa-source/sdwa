@@ -15,6 +15,8 @@ export const metadata = {
     'Learn about Salem District Weightlifting Association (SDWA), our state affiliation to TNSWA, official objectives, sporting focus, non-profit public service, mission, vision, and executive committee leadership.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function AboutPage() {
   let committee: CommitteeMember[] = [];
   let fetchedObjectives: AssociationObjective[] = [];
