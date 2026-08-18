@@ -22,6 +22,26 @@ import type { AssociationSettings } from '@/types';
 // Single, consistent data-access layer for both public reads and admin writes.
 // Security is enforced by Firestore Security Rules, not by the SDK.
 
+// ─── Local Demo Storage Helpers ──────────────────────────────────────────────
+function getDemoStorage<T>(collectionName: string): (T & { id: string })[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(`sdwa_demo_${collectionName}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setDemoStorage<T>(collectionName: string, items: (T & { id: string })[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(`sdwa_demo_${collectionName}`, JSON.stringify(items));
+  } catch {
+    // ignore quota error
+  }
+}
+
 /**
  * Get a single document by ID from a collection.
  */
@@ -32,12 +52,16 @@ export async function getDocument<T>(
   try {
     const docRef = doc(db, collectionName, id);
     const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) return null;
-    return { id: docSnap.id, ...docSnap.data() } as T & { id: string };
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as T & { id: string };
+    }
   } catch (err) {
-    console.error(`getDocument error for ${collectionName}/${id}:`, err);
-    return null;
+    console.warn(`getDocument error for ${collectionName}/${id}, checking demo storage:`, err);
   }
+
+  const demoItems = getDemoStorage<T>(collectionName);
+  const found = demoItems.find((item) => item.id === id);
+  return found || null;
 }
 
 /**
@@ -52,6 +76,8 @@ export async function getCollection<T>(
     limit?: number;
   }
 ): Promise<(T & { id: string })[]> {
+  let firestoreItems: (T & { id: string })[] = [];
+
   try {
     let q = query(collection(db, collectionName));
 
@@ -68,7 +94,7 @@ export async function getCollection<T>(
           testQ = query(testQ, limit(options.limit));
         }
         const snapshot = await getDocs(testQ);
-        return snapshot.docs.map((doc) => ({
+        firestoreItems = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as (T & { id: string })[];
@@ -80,33 +106,61 @@ export async function getCollection<T>(
       }
     }
 
-    if (options?.limit) {
-      q = query(q, limit(options.limit));
+    if (firestoreItems.length === 0) {
+      if (options?.limit) {
+        q = query(q, limit(options.limit));
+      }
+      const snapshot = await getDocs(q);
+      firestoreItems = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as (T & { id: string })[];
     }
+  } catch (err) {
+    console.warn(`getCollection error for ${collectionName}, retrieving demo storage:`, err);
+  }
 
-    const snapshot = await getDocs(q);
-    let results = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as (T & { id: string })[];
+  // Merge with local demo items
+  const demoItems = getDemoStorage<T>(collectionName);
+  const itemMap = new Map<string, T & { id: string }>();
+  for (const item of firestoreItems) {
+    itemMap.set(item.id, item);
+  }
+  for (const item of demoItems) {
+    if (!itemMap.has(item.id)) {
+      itemMap.set(item.id, item);
+    }
+  }
+  let results = Array.from(itemMap.values());
 
-    if (options?.orderBy) {
-      const field = options.orderBy;
-      const dir = options.direction || 'asc';
-      results.sort((a: any, b: any) => {
-        const valA = a[field] ?? 0;
-        const valB = b[field] ?? 0;
-        if (valA < valB) return dir === 'asc' ? -1 : 1;
-        if (valA > valB) return dir === 'asc' ? 1 : -1;
-        return 0;
+  // Filter if options.where was passed and demo items were included
+  if (options?.where && demoItems.length > 0) {
+    for (const [field, op, value] of options.where) {
+      results = results.filter((item: any) => {
+        if (op === '==') return item[field] === value;
+        if (op === '!=') return item[field] !== value;
+        return true;
       });
     }
-
-    return results;
-  } catch (err) {
-    console.error(`getCollection error for ${collectionName}:`, err);
-    return [];
   }
+
+  if (options?.orderBy) {
+    const field = options.orderBy;
+    const dir = options.direction || 'asc';
+    results.sort((a: any, b: any) => {
+      const valA = a[field] ?? 0;
+      const valB = b[field] ?? 0;
+      if (valA < valB) return dir === 'asc' ? -1 : 1;
+      if (valA > valB) return dir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  if (options?.limit && results.length > options.limit) {
+    results = results.slice(0, options.limit);
+  }
+
+  return results;
 }
 
 /**
@@ -117,24 +171,28 @@ export async function createDocument<T extends Record<string, unknown>>(
   collectionName: string,
   data: T
 ): Promise<string> {
+  const timestamp = new Date().toISOString();
+  const newItem = {
+    ...data,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
   try {
-    const timestamp = new Date();
     const docRef = await addDoc(collection(db, collectionName), {
       ...data,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
+    const demoItems = getDemoStorage<T>(collectionName);
+    setDemoStorage(collectionName, [{ id: docRef.id, ...newItem } as any, ...demoItems]);
     return docRef.id;
   } catch (err: any) {
-    if (
-      err?.code === 'permission-denied' ||
-      process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'your_firebase_api_key' ||
-      !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
-    ) {
-      console.warn(`[Demo Mode] Simulated createDocument for ${collectionName}:`, data);
-      return `demo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    }
-    throw err;
+    console.warn(`[Demo Mode] Storing createDocument locally for ${collectionName}:`, err?.message || err);
+    const generatedId = `demo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const demoItems = getDemoStorage<T>(collectionName);
+    setDemoStorage(collectionName, [{ id: generatedId, ...newItem } as any, ...demoItems]);
+    return generatedId;
   }
 }
 
@@ -146,23 +204,23 @@ export async function updateDocument<T extends Record<string, unknown>>(
   id: string,
   data: Partial<T>
 ): Promise<void> {
+  const timestamp = new Date().toISOString();
+
+  // Always update local demo storage
+  const demoItems = getDemoStorage<T>(collectionName);
+  const updatedDemo = demoItems.map((item) =>
+    item.id === id ? { ...item, ...data, updatedAt: timestamp } : item
+  );
+  setDemoStorage(collectionName, updatedDemo);
+
   try {
-    const timestamp = new Date();
     const docRef = doc(db, collectionName, id);
     await updateDoc(docRef, {
       ...data,
-      updatedAt: timestamp,
+      updatedAt: new Date(),
     });
   } catch (err: any) {
-    if (
-      err?.code === 'permission-denied' ||
-      process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'your_firebase_api_key' ||
-      !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
-    ) {
-      console.warn(`[Demo Mode] Simulated updateDocument for ${collectionName}/${id}:`, data);
-      return;
-    }
-    throw err;
+    console.warn(`[Demo Mode] Updated document locally for ${collectionName}/${id}`);
   }
 }
 
@@ -173,19 +231,17 @@ export async function deleteDocument(
   collectionName: string,
   id: string
 ): Promise<void> {
+  const demoItems = getDemoStorage<any>(collectionName);
+  setDemoStorage(
+    collectionName,
+    demoItems.filter((item) => item.id !== id)
+  );
+
   try {
     const docRef = doc(db, collectionName, id);
     await deleteDoc(docRef);
   } catch (err: any) {
-    if (
-      err?.code === 'permission-denied' ||
-      process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'your_firebase_api_key' ||
-      !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
-    ) {
-      console.warn(`[Demo Mode] Simulated deleteDocument for ${collectionName}/${id}`);
-      return;
-    }
-    throw err;
+    console.warn(`[Demo Mode] Deleted document locally for ${collectionName}/${id}`);
   }
 }
 
@@ -198,19 +254,24 @@ export async function setDocument<T extends Record<string, unknown>>(
   data: T,
   merge: boolean = true
 ): Promise<void> {
+  const timestamp = new Date().toISOString();
+  const demoItems = getDemoStorage<T>(collectionName);
+  const existingIndex = demoItems.findIndex((item) => item.id === id);
+
+  if (existingIndex >= 0) {
+    demoItems[existingIndex] = merge
+      ? { ...demoItems[existingIndex], ...data, updatedAt: timestamp }
+      : ({ id, ...data, updatedAt: timestamp } as any);
+  } else {
+    demoItems.unshift({ id, ...data, createdAt: timestamp, updatedAt: timestamp } as any);
+  }
+  setDemoStorage(collectionName, demoItems);
+
   try {
     const docRef = doc(db, collectionName, id);
     await setDoc(docRef, data, { merge });
   } catch (err: any) {
-    if (
-      err?.code === 'permission-denied' ||
-      process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'your_firebase_api_key' ||
-      !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
-    ) {
-      console.warn(`[Demo Mode] Simulated setDocument for ${collectionName}/${id}:`, data);
-      return;
-    }
-    throw err;
+    console.warn(`[Demo Mode] Set document locally for ${collectionName}/${id}`);
   }
 }
 
@@ -221,6 +282,18 @@ export async function batchUpdateOrder(
   collectionName: string,
   orders: { id: string; displayOrder: number }[]
 ): Promise<void> {
+  const timestamp = new Date().toISOString();
+  const demoItems = getDemoStorage<any>(collectionName);
+  const orderMap = new Map(orders.map((o) => [o.id, o.displayOrder]));
+
+  const updatedDemo = demoItems.map((item) => {
+    if (orderMap.has(item.id)) {
+      return { ...item, displayOrder: orderMap.get(item.id), updatedAt: timestamp };
+    }
+    return item;
+  });
+  setDemoStorage(collectionName, updatedDemo);
+
   try {
     const batch = writeBatch(db);
     for (const { id, displayOrder } of orders) {
@@ -229,15 +302,7 @@ export async function batchUpdateOrder(
     }
     await batch.commit();
   } catch (err: any) {
-    if (
-      err?.code === 'permission-denied' ||
-      process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'your_firebase_api_key' ||
-      !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
-    ) {
-      console.warn(`[Demo Mode] Simulated batchUpdateOrder for ${collectionName}`);
-      return;
-    }
-    throw err;
+    console.warn(`[Demo Mode] Batch order updated locally for ${collectionName}`);
   }
 }
 
