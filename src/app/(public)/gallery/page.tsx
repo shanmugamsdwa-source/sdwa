@@ -12,7 +12,7 @@ export const metadata = {
     'Official photography archive of Salem District Weightlifting championships, medal ceremonies, and academy training moments.',
 };
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function GalleryPage() {
   let albums: GalleryAlbum[] = [];

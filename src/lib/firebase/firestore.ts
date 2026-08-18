@@ -211,30 +211,37 @@ export async function getCollection<T>(
     console.warn(`getCollection error for ${collectionName}, retrieving demo storage:`, err);
   }
 
-  // Merge with local demo items
+  // 1. Get demo items and deleted IDs
+  const deleted = getDeletedIds(collectionName);
   const demoItems = getDemoStorage<T>(collectionName);
+
+  // 2. Build itemMap: start with firestoreItems, then let demoItems OVERWRITE (newer local edits win)
   const itemMap = new Map<string, T & { id: string }>();
   for (const item of firestoreItems) {
-    itemMap.set(item.id, item);
+    if (!deleted.has(item.id)) {
+      itemMap.set(item.id, item);
+    }
   }
   for (const item of demoItems) {
-    if (!itemMap.has(item.id)) {
-      itemMap.set(item.id, item);
+    if (!deleted.has(item.id)) {
+      itemMap.set(item.id, item); // Local demo items overwrite older state
     }
   }
   let results = Array.from(itemMap.values());
 
-  // Filter if options.where was passed and demo items were included
-  if (options?.where && demoItems.length > 0) {
+  // 3. Always apply options.where filtering in memory to ensure 100% accurate results
+  if (options?.where) {
     for (const [field, op, value] of options.where) {
       results = results.filter((item: any) => {
         if (op === '==') return item[field] === value;
         if (op === '!=') return item[field] !== value;
+        if (op === 'in' && Array.isArray(value)) return value.includes(item[field]);
         return true;
       });
     }
   }
 
+  // 4. Always apply options.orderBy in memory
   if (options?.orderBy) {
     const field = options.orderBy;
     const dir = options.direction || 'asc';
@@ -247,6 +254,7 @@ export async function getCollection<T>(
     });
   }
 
+  // 5. Apply limit
   if (options?.limit && results.length > options.limit) {
     results = results.slice(0, options.limit);
   }
