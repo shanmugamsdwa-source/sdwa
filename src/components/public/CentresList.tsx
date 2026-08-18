@@ -89,7 +89,7 @@ export default function CentresList({ initialCentres }: CentresListProps) {
       const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : 999;
       return orderA - orderB;
     });
-  }, [initialCentres, selectedType, searchQuery, sortBy]);
+  }, [centres, selectedType, searchQuery, sortBy]);
 
   const hasActiveFilters = selectedType !== 'ALL' || searchQuery.trim() !== '';
 
@@ -165,7 +165,7 @@ export default function CentresList({ initialCentres }: CentresListProps) {
                 : 'bg-[#0f172a] text-slate-300 border border-slate-700/80 hover:bg-slate-800'
             }`}
           >
-            All ({initialCentres.length})
+            All ({centres.length})
           </button>
 
           {dynamicTypes.map(({ type, count }) => (
@@ -197,7 +197,7 @@ export default function CentresList({ initialCentres }: CentresListProps) {
       {/* Results Header */}
       <div className="flex items-center justify-between px-2">
         <p className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
-          Showing <span className="text-amber-400">{filteredAndSorted.length}</span> of {initialCentres.length} Affiliated Centres
+          Showing <span className="text-amber-400">{filteredAndSorted.length}</span> of {centres.length} Affiliated Centres
         </p>
       </div>
 
