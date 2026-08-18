@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ─────────────────────────────────────────────────
+    
+    // Check if the user is authenticated via Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // Check if the user has an authorized admin record in adminUsers or admins collection
+    function isAdmin() {
+      return isAuthenticated() && (
+        (
+          exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid)) &&
+          (
+            get(/databases/$(database)/documents/adminUsers/$(request.auth.uid)).data.role in ['SUPER_ADMIN', 'ADMIN'] ||
+            get(/databases/$(database)/documents/adminUsers/$(request.auth.uid)).data.isAdmin == true
+          )
+        ) || (
+          exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+          (
+            get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.isAdmin == true ||
+            get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role in ['SUPER_ADMIN', 'ADMIN']
+          )
+        )
+      );
+    }
+
+    // ─── Admin Users Collections ──────────────────────────────────────────
+    // Admin documents can only be read by the authenticated owner (their own UID).
+    // Direct client write/creation is locked to prevent unauthorized privilege escalation.
+    match /adminUsers/{uid} {
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /admins/{uid} {
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // ─── Association Settings & Metadata ──────────────────────────────────
+    // Read: Public. Write: Authorized SDWA Admin.
+    match /settings/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── Committee Members ────────────────────────────────────────────────
+    match /committeeMembers/{memberId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── Affiliated Centres & Institutions ────────────────────────────────
+    match /affiliatedInstitutions/{institutionId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── Achievements & Brackets ──────────────────────────────────────────
+    match /achievements/{achievementId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /achievementCategories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /achievementLevels/{levelId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── Tournaments & Weight Divisions ───────────────────────────────────
+    match /tournaments/{tournamentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tournamentCategories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /weightDivisions/{divisionId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /weightClasses/{weightClassId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── Gallery Albums & Images ──────────────────────────────────────────
+    match /galleryAlbums/{albumId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /galleryImages/{imageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── Association Objectives & Commitments ─────────────────────────────
+    match /associationObjectives/{objectiveId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
