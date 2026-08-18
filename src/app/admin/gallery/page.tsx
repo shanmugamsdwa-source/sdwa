@@ -275,17 +275,14 @@ export default function GalleryAdminPage() {
                     <span>Manage Photos ({album.imageCount || 0})</span>
                   </Link>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => {
-                        setEditingAlbum(album);
-                        setIsNew(false);
-                      }}
+                    <Link
+                      href={`/admin/gallery/${album.id}`}
                       className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-blue-400 rounded-xl transition-colors"
-                      title="Edit Album Details"
+                      title="Edit Album & Photos"
                       aria-label="Edit Album"
                     >
                       <Edit size={16} />
-                    </button>
+                    </Link>
                     <button
                       onClick={() => handleDelete(album.id)}
                       className="p-2.5 bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 rounded-xl transition-colors"

@@ -7,6 +7,7 @@ import { GalleryAlbum, GalleryImage, COLLECTIONS } from '@/types';
 import {
   getDocument,
   getCollection,
+  getBySlugOrId,
   updateDocument,
   createDocument,
   deleteDocument,
@@ -36,26 +37,26 @@ export default function AlbumDetailPage({
     try {
       setLoading(true);
 
-      const [albumData, imgData] = await Promise.all([
-        getDocument<GalleryAlbum>(COLLECTIONS.GALLERY_ALBUMS, id),
-        getCollection<GalleryImage>(COLLECTIONS.GALLERY_IMAGES, {
-          where: [['albumId', '==', id]],
-          orderBy: 'displayOrder',
-        }),
-      ]);
+      const albumData = await getBySlugOrId<GalleryAlbum>(COLLECTIONS.GALLERY_ALBUMS, id);
 
       if (albumData) {
         setAlbum(albumData);
+
+        const imgData = await getCollection<GalleryImage>(COLLECTIONS.GALLERY_IMAGES, {
+          where: [['albumId', '==', albumData.id]],
+          orderBy: 'displayOrder',
+        });
+
+        setImages(
+          imgData.map((img) => ({
+            id: img.id,
+            url: img.url,
+            publicId: img.publicId,
+            caption: img.caption,
+            displayOrder: img.displayOrder,
+          }))
+        );
       }
-      setImages(
-        imgData.map((img) => ({
-          id: img.id,
-          url: img.url,
-          publicId: img.publicId,
-          caption: img.caption,
-          displayOrder: img.displayOrder,
-        }))
-      );
     } catch (err) {
       console.error(err);
       setError('Failed to load album data');
@@ -75,9 +76,10 @@ export default function AlbumDetailPage({
     try {
       setSaving(true);
       setError(null);
+      const realAlbumId = album.id;
 
       // 1. Update album metadata
-      await updateDocument(COLLECTIONS.GALLERY_ALBUMS, id, {
+      await updateDocument(COLLECTIONS.GALLERY_ALBUMS, realAlbumId, {
         title: album.title,
         description: album.description,
         coverImageUrl: album.coverImageUrl || (images[0]?.url || ''),
@@ -88,7 +90,7 @@ export default function AlbumDetailPage({
 
       // 2. Fetch existing images to compute diff
       const existingImages = await getCollection<GalleryImage>(COLLECTIONS.GALLERY_IMAGES, {
-        where: [['albumId', '==', id]],
+        where: [['albumId', '==', realAlbumId]],
       });
 
       const currentImageIds = new Set(images.map((img) => img.id).filter(Boolean));
@@ -119,7 +121,7 @@ export default function AlbumDetailPage({
       await Promise.all(
         images.map(async (img, idx) => {
           const payload = {
-            albumId: id,
+            albumId: realAlbumId,
             url: img.url,
             publicId: img.publicId || '',
             caption: img.caption || '',

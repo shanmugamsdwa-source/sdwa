@@ -23,38 +23,90 @@ import type { AssociationSettings } from '@/types';
 // Security is enforced by Firestore Security Rules, not by the SDK.
 
 // ─── Local Demo Storage Helpers (Server + Client) ─────────────────────────────
+function getDeletedIds(collectionName: string): Set<string> {
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(`sdwa_deleted_${collectionName}`);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  }
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const filePath = path.join(process.cwd(), 'public', 'uploads', `demo_deleted_${collectionName}.json`);
+    if (fs.existsSync(filePath)) {
+      return new Set(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+    }
+  } catch {}
+  return new Set();
+}
+
+function addDeletedId(collectionName: string, id: string) {
+  const deleted = getDeletedIds(collectionName);
+  deleted.add(id);
+  const arr = Array.from(deleted);
+
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`sdwa_deleted_${collectionName}`, JSON.stringify(arr));
+      fetch('/api/admin/demo-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collectionName: `deleted_${collectionName}`, items: arr }),
+      }).catch(() => {});
+    } catch {}
+  } else {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      const filePath = path.join(uploadsDir, `demo_deleted_${collectionName}.json`);
+      fs.writeFileSync(filePath, JSON.stringify(arr, null, 2), 'utf8');
+    } catch {}
+  }
+}
+
 function getDemoStorage<T>(collectionName: string): (T & { id: string })[] {
+  const deleted = getDeletedIds(collectionName);
+  let items: (T & { id: string })[] = [];
+
   // If in browser
   if (typeof window !== 'undefined') {
     try {
       const raw = localStorage.getItem(`sdwa_demo_${collectionName}`);
-      return raw ? JSON.parse(raw) : [];
+      items = raw ? JSON.parse(raw) : [];
     } catch {
-      return [];
+      items = [];
     }
+  } else {
+    // If on server (SSR / Node.js)
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const filePath = path.join(process.cwd(), 'public', 'uploads', `demo_${collectionName}.json`);
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        items = JSON.parse(content);
+      }
+    } catch (e) {}
   }
 
-  // If on server (SSR / Node.js)
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const filePath = path.join(process.cwd(), 'public', 'uploads', `demo_${collectionName}.json`);
-    if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, 'utf8');
-      return JSON.parse(content);
-    }
-  } catch (e) {
-    // ignore
-  }
-
-  return [];
+  return items.filter((item) => !deleted.has(item.id));
 }
 
 function setDemoStorage<T>(collectionName: string, items: (T & { id: string })[]) {
+  const deleted = getDeletedIds(collectionName);
+  const filtered = items.filter((item) => !deleted.has(item.id));
+
   // If in browser: update localStorage AND sync to server disk
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem(`sdwa_demo_${collectionName}`, JSON.stringify(items));
+      localStorage.setItem(`sdwa_demo_${collectionName}`, JSON.stringify(filtered));
     } catch {}
 
     // Async sync to server API for SSR
@@ -62,7 +114,7 @@ function setDemoStorage<T>(collectionName: string, items: (T & { id: string })[]
       fetch('/api/admin/demo-sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ collectionName, items }),
+        body: JSON.stringify({ collectionName, items: filtered }),
       }).catch(() => {});
     } catch {}
     return;
@@ -77,10 +129,8 @@ function setDemoStorage<T>(collectionName: string, items: (T & { id: string })[]
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
     const filePath = path.join(uploadsDir, `demo_${collectionName}.json`);
-    fs.writeFileSync(filePath, JSON.stringify(items, null, 2), 'utf8');
-  } catch (e) {
-    // ignore
-  }
+    fs.writeFileSync(filePath, JSON.stringify(filtered, null, 2), 'utf8');
+  } catch (e) {}
 }
 
 /**
@@ -272,6 +322,7 @@ export async function deleteDocument(
   collectionName: string,
   id: string
 ): Promise<void> {
+  addDeletedId(collectionName, id);
   const demoItems = getDemoStorage<any>(collectionName);
   setDemoStorage(
     collectionName,
