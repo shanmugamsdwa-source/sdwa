@@ -23,7 +23,7 @@ export default function CentresList({ initialCentres }: CentresListProps) {
     async function syncCentres() {
       try {
         const latest = await import('@/lib/firebase/firestore').then((m) =>
-          m.getCollection<AffiliatedCentre>('affiliatedCentres', { orderBy: 'displayOrder' })
+          m.getCollection<AffiliatedCentre>('affiliatedInstitutions', { orderBy: 'displayOrder' })
         );
         if (latest) setCentres(latest);
       } catch (e) {}

@@ -1,5 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Oswald, Cinzel, JetBrains_Mono } from "next/font/google";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#0F172A",
+};
 import "./globals.css";
 import SmoothScrollProvider from "@/components/public/SmoothScrollProvider";
 
