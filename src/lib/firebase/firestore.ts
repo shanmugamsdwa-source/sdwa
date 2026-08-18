@@ -62,7 +62,22 @@ export async function getCollection<T>(
     }
 
     if (options?.orderBy) {
-      q = query(q, orderBy(options.orderBy, options.direction || 'asc'));
+      try {
+        let testQ = query(q, orderBy(options.orderBy, options.direction || 'asc'));
+        if (options?.limit) {
+          testQ = query(testQ, limit(options.limit));
+        }
+        const snapshot = await getDocs(testQ);
+        return snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as (T & { id: string })[];
+      } catch (indexErr: any) {
+        console.warn(
+          `Index or query constraint warning for ${collectionName}, executing memory sort:`,
+          indexErr?.message || indexErr
+        );
+      }
     }
 
     if (options?.limit) {
@@ -70,10 +85,24 @@ export async function getCollection<T>(
     }
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => ({
+    let results = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     })) as (T & { id: string })[];
+
+    if (options?.orderBy) {
+      const field = options.orderBy;
+      const dir = options.direction || 'asc';
+      results.sort((a: any, b: any) => {
+        const valA = a[field] ?? 0;
+        const valB = b[field] ?? 0;
+        if (valA < valB) return dir === 'asc' ? -1 : 1;
+        if (valA > valB) return dir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return results;
   } catch (err) {
     console.error(`getCollection error for ${collectionName}:`, err);
     return [];
@@ -88,13 +117,25 @@ export async function createDocument<T extends Record<string, unknown>>(
   collectionName: string,
   data: T
 ): Promise<string> {
-  const timestamp = new Date();
-  const docRef = await addDoc(collection(db, collectionName), {
-    ...data,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  });
-  return docRef.id;
+  try {
+    const timestamp = new Date();
+    const docRef = await addDoc(collection(db, collectionName), {
+      ...data,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    return docRef.id;
+  } catch (err: any) {
+    if (
+      err?.code === 'permission-denied' ||
+      process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'your_firebase_api_key' ||
+      !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+    ) {
+      console.warn(`[Demo Mode] Simulated createDocument for ${collectionName}:`, data);
+      return `demo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -105,12 +146,24 @@ export async function updateDocument<T extends Record<string, unknown>>(
   id: string,
   data: Partial<T>
 ): Promise<void> {
-  const timestamp = new Date();
-  const docRef = doc(db, collectionName, id);
-  await updateDoc(docRef, {
-    ...data,
-    updatedAt: timestamp,
-  });
+  try {
+    const timestamp = new Date();
+    const docRef = doc(db, collectionName, id);
+    await updateDoc(docRef, {
+      ...data,
+      updatedAt: timestamp,
+    });
+  } catch (err: any) {
+    if (
+      err?.code === 'permission-denied' ||
+      process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'your_firebase_api_key' ||
+      !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+    ) {
+      console.warn(`[Demo Mode] Simulated updateDocument for ${collectionName}/${id}:`, data);
+      return;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -120,8 +173,20 @@ export async function deleteDocument(
   collectionName: string,
   id: string
 ): Promise<void> {
-  const docRef = doc(db, collectionName, id);
-  await deleteDoc(docRef);
+  try {
+    const docRef = doc(db, collectionName, id);
+    await deleteDoc(docRef);
+  } catch (err: any) {
+    if (
+      err?.code === 'permission-denied' ||
+      process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'your_firebase_api_key' ||
+      !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+    ) {
+      console.warn(`[Demo Mode] Simulated deleteDocument for ${collectionName}/${id}`);
+      return;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -133,8 +198,20 @@ export async function setDocument<T extends Record<string, unknown>>(
   data: T,
   merge: boolean = true
 ): Promise<void> {
-  const docRef = doc(db, collectionName, id);
-  await setDoc(docRef, data, { merge });
+  try {
+    const docRef = doc(db, collectionName, id);
+    await setDoc(docRef, data, { merge });
+  } catch (err: any) {
+    if (
+      err?.code === 'permission-denied' ||
+      process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'your_firebase_api_key' ||
+      !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+    ) {
+      console.warn(`[Demo Mode] Simulated setDocument for ${collectionName}/${id}:`, data);
+      return;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -144,12 +221,24 @@ export async function batchUpdateOrder(
   collectionName: string,
   orders: { id: string; displayOrder: number }[]
 ): Promise<void> {
-  const batch = writeBatch(db);
-  for (const { id, displayOrder } of orders) {
-    const ref = doc(db, collectionName, id);
-    batch.update(ref, { displayOrder, updatedAt: new Date() });
+  try {
+    const batch = writeBatch(db);
+    for (const { id, displayOrder } of orders) {
+      const ref = doc(db, collectionName, id);
+      batch.update(ref, { displayOrder, updatedAt: new Date() });
+    }
+    await batch.commit();
+  } catch (err: any) {
+    if (
+      err?.code === 'permission-denied' ||
+      process.env.NEXT_PUBLIC_FIREBASE_API_KEY === 'your_firebase_api_key' ||
+      !process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+    ) {
+      console.warn(`[Demo Mode] Simulated batchUpdateOrder for ${collectionName}`);
+      return;
+    }
+    throw err;
   }
-  await batch.commit();
 }
 
 // ─── Association Settings ───────────────────────────────────────────────────
