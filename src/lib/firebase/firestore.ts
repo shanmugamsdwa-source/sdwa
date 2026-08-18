@@ -140,19 +140,27 @@ export async function getDocument<T>(
   collectionName: string,
   id: string
 ): Promise<(T & { id: string }) | null> {
+  const deleted = getDeletedIds(collectionName);
+  if (deleted.has(id)) return null;
+
+  let firestoreItem: (T & { id: string }) | null = null;
   try {
     const docRef = doc(db, collectionName, id);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() } as T & { id: string };
+      firestoreItem = { id: docSnap.id, ...docSnap.data() } as T & { id: string };
     }
   } catch (err) {
     console.warn(`getDocument error for ${collectionName}/${id}, checking demo storage:`, err);
   }
 
   const demoItems = getDemoStorage<T>(collectionName);
-  const found = demoItems.find((item) => item.id === id);
-  return found || null;
+  const demoItem = demoItems.find((item) => item.id === id);
+
+  if (firestoreItem && demoItem) {
+    return { ...firestoreItem, ...demoItem };
+  }
+  return firestoreItem || demoItem || null;
 }
 
 /**
@@ -224,7 +232,8 @@ export async function getCollection<T>(
   }
   for (const item of demoItems) {
     if (!deleted.has(item.id)) {
-      itemMap.set(item.id, item); // Local demo items overwrite older state
+      const existing = itemMap.get(item.id) || ({} as any);
+      itemMap.set(item.id, { ...existing, ...item }); // Deep merge edited fields over firestore item!
     }
   }
   let results = Array.from(itemMap.values());
