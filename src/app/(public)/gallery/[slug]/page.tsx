@@ -95,7 +95,7 @@ export default async function GalleryAlbumPage({ params }: GalleryAlbumPageProps
         </div>
 
         {/* Dynamic Masonry Photos & Lightbox */}
-        <AlbumPhotosClient photos={photos} albumTitle={album.title} />
+        <AlbumPhotosClient photos={photos} albumTitle={album.title} albumId={album.id} />
       </div>
     </main>
   );
