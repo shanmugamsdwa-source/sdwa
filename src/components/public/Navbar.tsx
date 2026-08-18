@@ -62,7 +62,7 @@ export default function Navbar() {
                 href="https://www.instagram.com/isha_gym_shanmugam?igsh=MnlneHF1ZG9wb2Ny"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 hover:text-[#FCD34D] transition-colors"
+                className="text-[#FCD34D] hover:text-white transition-colors"
                 aria-label="Instagram"
                 title="Instagram"
               >
@@ -74,7 +74,7 @@ export default function Navbar() {
                 href="https://www.facebook.com/share/14kUMAKhV4x"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 hover:text-[#FCD34D] transition-colors"
+                className="text-[#FCD34D] hover:text-white transition-colors"
                 aria-label="Facebook"
                 title="Facebook"
               >
@@ -86,7 +86,7 @@ export default function Navbar() {
                 href="https://youtube.com/@ishagym_salem_tn?si=gxU5QBkCYOTBjxYb"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 hover:text-[#FCD34D] transition-colors"
+                className="text-[#FCD34D] hover:text-white transition-colors"
                 aria-label="YouTube"
                 title="YouTube"
               >

@@ -164,7 +164,7 @@ export default async function Footer() {
                       href={instagram}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-[#FCD34D] hover:border-amber-400 hover:bg-slate-750 transition-all shadow-sm"
+                      className="w-9 h-9 rounded-xl bg-slate-900 border border-amber-500/40 flex items-center justify-center text-amber-400 hover:text-slate-950 hover:bg-amber-400 hover:border-amber-300 transition-all shadow-md shadow-amber-500/10"
                       aria-label="Follow SDWA on Instagram"
                       title="Follow on Instagram"
                     >
@@ -178,7 +178,7 @@ export default async function Footer() {
                       href={facebook}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-[#FCD34D] hover:border-amber-400 hover:bg-slate-750 transition-all shadow-sm"
+                      className="w-9 h-9 rounded-xl bg-slate-900 border border-amber-500/40 flex items-center justify-center text-amber-400 hover:text-slate-950 hover:bg-amber-400 hover:border-amber-300 transition-all shadow-md shadow-amber-500/10"
                       aria-label="Follow SDWA on Facebook"
                       title="Follow on Facebook"
                     >
@@ -192,7 +192,7 @@ export default async function Footer() {
                       href={youtube}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-[#FCD34D] hover:border-amber-400 hover:bg-slate-750 transition-all shadow-sm"
+                      className="w-9 h-9 rounded-xl bg-slate-900 border border-amber-500/40 flex items-center justify-center text-amber-400 hover:text-slate-950 hover:bg-amber-400 hover:border-amber-300 transition-all shadow-md shadow-amber-500/10"
                       aria-label="Subscribe to SDWA on YouTube"
                       title="Subscribe on YouTube"
                     >
