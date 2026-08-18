@@ -307,9 +307,18 @@ export async function updateDocument<T extends Record<string, unknown>>(
 
   // Always update local demo storage
   const demoItems = getDemoStorage<T>(collectionName);
-  const updatedDemo = demoItems.map((item) =>
-    item.id === id ? { ...item, ...data, updatedAt: timestamp } : item
-  );
+  let found = false;
+  const updatedDemo = demoItems.map((item) => {
+    if (item.id === id) {
+      found = true;
+      return { ...item, ...data, updatedAt: timestamp };
+    }
+    return item;
+  });
+
+  if (!found) {
+    updatedDemo.unshift({ id, ...data, updatedAt: timestamp } as any);
+  }
   setDemoStorage(collectionName, updatedDemo);
 
   try {
