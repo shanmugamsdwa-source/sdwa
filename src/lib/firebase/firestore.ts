@@ -22,23 +22,64 @@ import type { AssociationSettings } from '@/types';
 // Single, consistent data-access layer for both public reads and admin writes.
 // Security is enforced by Firestore Security Rules, not by the SDK.
 
-// ─── Local Demo Storage Helpers ──────────────────────────────────────────────
+// ─── Local Demo Storage Helpers (Server + Client) ─────────────────────────────
 function getDemoStorage<T>(collectionName: string): (T & { id: string })[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(`sdwa_demo_${collectionName}`);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
+  // If in browser
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(`sdwa_demo_${collectionName}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
   }
+
+  // If on server (SSR / Node.js)
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const filePath = path.join(process.cwd(), 'public', 'uploads', `demo_${collectionName}.json`);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(content);
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return [];
 }
 
 function setDemoStorage<T>(collectionName: string, items: (T & { id: string })[]) {
-  if (typeof window === 'undefined') return;
+  // If in browser: update localStorage AND sync to server disk
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`sdwa_demo_${collectionName}`, JSON.stringify(items));
+    } catch {}
+
+    // Async sync to server API for SSR
+    try {
+      fetch('/api/admin/demo-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collectionName, items }),
+      }).catch(() => {});
+    } catch {}
+    return;
+  }
+
+  // If on server (Node.js)
   try {
-    localStorage.setItem(`sdwa_demo_${collectionName}`, JSON.stringify(items));
-  } catch {
-    // ignore quota error
+    const fs = require('fs');
+    const path = require('path');
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const filePath = path.join(uploadsDir, `demo_${collectionName}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(items, null, 2), 'utf8');
+  } catch (e) {
+    // ignore
   }
 }
 
